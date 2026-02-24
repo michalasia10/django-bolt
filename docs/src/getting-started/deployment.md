@@ -117,13 +117,20 @@ sudo systemctl reload nginx
 
 ## Database connections
 
-Django Bolt disables Django's `request_started` and `request_finished` signals by default for performance. These signals normally trigger database connection cleanup after each request.
+Django Bolt keeps Django request signals disabled by default for maximum throughput.
 
-Without signals, you should use connection pooling. Django [recommends connection pooling over persistent connections](https://docs.djangoproject.com/en/5.1/ref/databases/#persistent-connections) for async applications.
+```python
+# settings.py
+BOLT_EMIT_SIGNALS = False
+```
+
+With signals disabled, don't rely on request-signal-driven connection recycling.
+
+For ASGI deployments, keep persistent connections disabled (`CONN_MAX_AGE = 0`) and use pooling. See [Persistent connections](https://docs.djangoproject.com/en/6.0/ref/databases/#persistent-connections).
 
 ### Option 1: psycopg pool (recommended)
 
-Django 5.1+ has native connection pooling support with psycopg:
+Django 5.1+ has native PostgreSQL connection pooling support with psycopg:
 
 ```python
 # settings.py
@@ -134,6 +141,7 @@ DATABASES = {
         "USER": "myuser",
         "PASSWORD": "mypassword",
         "HOST": "localhost",
+        "CONN_MAX_AGE": 0,  # Required when using Django's psycopg pool
         "OPTIONS": {
             "pool": {
                 "min_size": 2,
@@ -144,7 +152,7 @@ DATABASES = {
 }
 ```
 
-Requires `psycopg[pool]` (`pip install "psycopg[pool]"`). Note: This does not work with psycopg2.
+Requires `psycopg[pool]` (`pip install "psycopg[pool]"`). With psycopg2, Django raises `ImproperlyConfigured` if `OPTIONS["pool"]` is set.
 
 ### Option 2: PgBouncer (external pooler)
 
@@ -153,32 +161,18 @@ Requires `psycopg[pool]` (`pip install "psycopg[pool]"`). Note: This does not wo
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "mydb",
-        "HOST": "/var/run/pgbouncer",  # Unix socket to PgBouncer
+        "NAME": "mydb",  # Database name configured in PgBouncer
+        "HOST": "127.0.0.1",  # PgBouncer host
         "PORT": "6432",
+        "CONN_MAX_AGE": 0,  # Recommended for ASGI
+        "DISABLE_SERVER_SIDE_CURSORS": True,  # Needed for transaction pooling
     }
 }
 ```
 
 [PgBouncer](https://www.pgbouncer.org/) runs as a separate service and manages connections across all Django processes.
 
-### Option 3: Enable signals
-
-If you need Django's connection management (e.g., `CONN_MAX_AGE=600`), enable signals:
-
-```python
-# settings.py
-BOLT_EMIT_SIGNALS = True
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": "mydb",
-        "CONN_MAX_AGE": 600,  # Close after 600s idle
-    }
-}
-```
-
-See [Django Signals](../topics/signals.md) for more details.
+If you need signal compatibility for third-party packages, see [Django Signals](../topics/signals.md).
 
 ## Performance tuning
 
@@ -230,8 +224,4 @@ The Rust parts (HTTP parsing, routing, compression) take microseconds. Your Pyth
 
 **Use processes for parallelism**, not workers. Each process has its own GIL, enabling true parallel execution.
 
-If you still want to increase workers, set the environment variable:
-
-```bash
-DJANGO_BOLT_WORKERS=2 python manage.py runbolt --processes 4
-```
+`runbolt` currently pins one worker per process. Scale with `--processes` for parallelism.

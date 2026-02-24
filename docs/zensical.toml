@@ -59,7 +59,6 @@ nav = [
   ]},
   { "Topic Guides" = [
     { "Routing" = "topics/routing.md" },
-    { "ASGI Mounts" = "topics/asgi-mounts.md" },
     { "Request Handling" = "topics/requests.md" },
     { "Responses" = "topics/responses.md" },
     { "Serializers" = "topics/serializers.md" },
@@ -78,6 +77,8 @@ nav = [
     { "Testing" = "topics/testing.md" },
     { "WebSocket" = "topics/websocket.md" },
     { "OpenAPI" = "topics/openapi.md" },
+    { "ASGI Mounts" = "topics/asgi-mounts.md" },
+
   ]},
   { "Reference" = [
     { "BoltAPI" = "ref/api.md" },
