@@ -141,6 +141,8 @@ class TestStaticRouteMetadata:
         assert meta.get("mode") == "mixed", "Static handler should be in 'mixed' mode"
         assert meta.get("is_async") is True, "Static handler should be marked as async"
         assert "path" in meta.get("path_params", set()), "Static handler should have 'path' as path param"
+        assert "response_type" in meta, "Static handler metadata must have 'response_type' key"
+        assert meta["response_type"] is None, "Static handler response_type should default to None"
 
     def test_static_injector_extracts_path(self):
         """Test that the static injector correctly extracts the path parameter."""

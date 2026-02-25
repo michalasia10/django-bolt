@@ -93,6 +93,7 @@ class TestStaticRouteMetadata:
             "is_async",
             "injector",
             "injector_is_async",
+            "response_type",
             "default_status_code",
         }
 
@@ -156,14 +157,22 @@ def test_static_route_serves_request_without_keyerror():
     if not api._static_routes_registered:
         pytest.skip("Static routes were not registered")
 
-    with TestClient(api, use_http_layer=True) as client:
-        # Request a file that likely doesn't exist — we expect 404, NOT 500
-        response = client.get("/static/nonexistent.css")
+    # Force /static/* requests through the Python static route by moving the
+    # Rust static middleware prefix away from /static.
+    static_config = {
+        "url_prefix": "/assets",
+        "directories": [],
+        "csp_header": None,
+    }
+
+    with TestClient(api, use_http_layer=True, static_files_config=static_config) as client:
+        # Request a known Django admin asset; this exercises the static handler
+        # registration path that can KeyError if metadata is incomplete.
+        response = client.get("/static/admin/css/login.css")
         assert response.status_code != 500, (
             f"Static route returned 500: likely KeyError in _dispatch. Body: {response.text[:200]}"
         )
-        # 404 is the correct response for a missing static file
-        assert response.status_code == 404
+        assert response.status_code in (200, 404)
 
 
 # ---------------------------------------------------------------------------
