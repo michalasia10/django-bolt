@@ -12,6 +12,10 @@ from typing import TYPE_CHECKING
 from django.conf import settings
 
 from django_bolt.admin.static import serve_static_file
+from django_bolt.middleware.compiler import (
+    add_optimization_flags_to_metadata,
+    compile_middleware_meta,
+)
 from django_bolt.typing import FieldDefinition
 
 if TYPE_CHECKING:
@@ -111,4 +115,22 @@ class StaticRouteRegistrar:
         meta["injector"] = static_injector
         meta["injector_is_async"] = False
 
+        # Guarantee all required metadata keys exist (same as _route_decorator).
+        # Without these, _dispatch will KeyError on the hot path.
+        meta["default_status_code"] = 200
+        meta["_router_middleware"] = []
+        meta["_route_middleware"] = []
+        meta["_has_route_python_middleware"] = False
+
         self.api._handler_meta[handler_id] = meta
+
+        # Compile the handler executor (required by _dispatch for both fast
+        # path and middleware path).  Must happen after meta is stored because
+        # _compile_handler_executor reads from the meta dict.
+        meta["_handler_executor"] = self.api._compile_handler_executor(meta)
+
+        # Compile middleware metadata so Rust-side optimization flags are set.
+        middleware_meta = compile_middleware_meta(handler, "GET", route_pattern, list(self.api._middleware))
+        middleware_meta = add_optimization_flags_to_metadata(middleware_meta, meta)
+        if middleware_meta:
+            self.api._handler_middleware[handler_id] = middleware_meta

@@ -265,15 +265,19 @@ pub fn start_server_async(
 
             // Get STATIC_ROOT (primary location for collected static files)
             // STATIC_ROOT can be a Path object, so convert via str()
+            // STATIC_ROOT defaults to None in Django when not configured --
+            // we must skip None to avoid converting it to the string "None".
             if let Ok(static_root) = settings.getattr("STATIC_ROOT") {
-                let root_str = static_root.extract::<String>().or_else(|_| {
-                    static_root
-                        .call_method0("__str__")
-                        .and_then(|s| s.extract::<String>())
-                });
-                if let Ok(root_str) = root_str {
-                    if !root_str.is_empty() {
-                        directories.push(root_str);
+                if !static_root.is_none() {
+                    let root_str = static_root.extract::<String>().or_else(|_| {
+                        static_root
+                            .call_method0("__str__")
+                            .and_then(|s| s.extract::<String>())
+                    });
+                    if let Ok(root_str) = root_str {
+                        if !root_str.is_empty() {
+                            directories.push(root_str);
+                        }
                     }
                 }
             }
@@ -522,18 +526,6 @@ pub fn start_server_async(
                     .unwrap_or(KeepAlive::Os);
 
                 {
-                    // Print compression status
-                    if let Some(ref comp_cfg) = global_compression_config {
-                        eprintln!(
-                            "[django-bolt] Compression: enabled (backend={}, min_size={} bytes, fallback={})",
-                            comp_cfg.backend,
-                            comp_cfg.minimum_size,
-                            if comp_cfg.gzip_fallback { "gzip" } else { "none" }
-                        );
-                    } else {
-                        eprintln!("[django-bolt] Compression: enabled (default settings)");
-                    }
-
                     let server = HttpServer::new(move || {
                         let mut app = App::new()
                             .app_data(web::Data::new(app_state.clone()))
