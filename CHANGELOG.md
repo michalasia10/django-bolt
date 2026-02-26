@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.4]
+
+### Added
+
+- **ASGI support for Django views and URL mounts** - Added ASGI mounting support for Django views/URLs with updates in routing, middleware response handling, server integration, and test client behavior. (#145)
+- **Rust-side argument prebinding on hot path** - Added Rust prebinding path to reduce Python injector overhead during request handling.
+- **Structured `runbolt` startup banner** - Redesigned startup output with clearer structured runtime information.
+
+### Changed
+
+- **Core hot-path optimizations** - Reduced unnecessary cloning/parsing and improved sync serialization and request pipeline performance.
+- **Parameter extraction updates for msgspec annotations** - Improved extraction behavior and middleware compilation for msgspec-based annotations.
+- **Testing/runtime dependencies** - Added `httpx` to installation dependencies and aligned testing docs with the runtime setup.
+
+### Fixed
+
+- **OpenAPI nested serializer schema generation** - Fixed nested serializer schema rendering in generated OpenAPI docs. (#144)
+- **Multiprocess shutdown handling** - Fixed process shutdown behavior for multiprocess `runbolt` execution.
+- **Static file serving** - Fixed static file serving behavior in fresh installs and removed bundled example admin staticfiles to rely on the proper Django static pipeline.
+- **Minor typo fix** - Corrected typo. (#138)
+
+### Documentation
+
+- Added ASGI mounts documentation and updated API/routing/settings references.
+- Fixed repository URL in README. (#148)
+- Corrected Agents file naming and additional docs assumption fixes.
+
 ## [0.6.0]
 
 ### Added
