@@ -823,7 +823,6 @@ async def file_static_nonexistent():
 
 
 # ==== Streaming endpoints for benchmarks ====
-# TODO: Add proper api for streaming files
 @api.get("/stream")
 @no_compress
 async def stream_plain():
@@ -832,6 +831,7 @@ async def stream_plain():
             yield "x"
 
     return StreamingResponse(gen(), media_type="text/plain")
+
 
 
 @api.get("/collected")
