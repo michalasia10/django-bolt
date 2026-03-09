@@ -91,9 +91,10 @@ if [ "$DRY_RUN" = false ]; then
     warning "\nThis will:
   1. Update version in pyproject.toml: $CURRENT_VERSION → $VERSION
   2. Update version in Cargo.toml: $CURRENT_VERSION → $VERSION
-  3. Commit changes with message: 'Bump version to $VERSION'
-  4. Create and push tag: v$VERSION
-  5. Trigger GitHub Actions CI/CD pipeline
+  3. Update uv.lock and Cargo.lock
+  4. Commit changes with message: 'Bump version to $VERSION'
+  5. Create and push tag: v$VERSION
+  6. Trigger GitHub Actions CI/CD pipeline
 
 Proceed? (y/N)"
     read -r response
@@ -104,7 +105,7 @@ Proceed? (y/N)"
 fi
 
 # Step 1: Update pyproject.toml
-info "\n[1/6] Updating pyproject.toml..."
+info "\n[1/7] Updating pyproject.toml..."
 if [ "$DRY_RUN" = true ]; then
     info "Would update: version = \"$CURRENT_VERSION\" → version = \"$VERSION\""
 else
@@ -118,7 +119,7 @@ else
 fi
 
 # Step 2: Update Cargo.toml
-info "\n[2/6] Updating Cargo.toml..."
+info "\n[2/7] Updating Cargo.toml..."
 if [ "$DRY_RUN" = true ]; then
     info "Would update: version = \"$CURRENT_VERSION\" → version = \"$VERSION\""
 else
@@ -130,8 +131,20 @@ else
     success "Updated Cargo.toml"
 fi
 
-# Step 3: Verify changes
-info "\n[3/6] Verifying changes..."
+# Step 3: Update lock files
+info "\n[3/7] Updating lock files..."
+if [ "$DRY_RUN" = true ]; then
+    info "Would run: uv lock"
+    info "Would run: cargo update --workspace"
+else
+    uv lock
+    success "Updated uv.lock"
+    cargo update --workspace
+    success "Updated Cargo.lock"
+fi
+
+# Step 4: Verify changes
+info "\n[4/7] Verifying changes..."
 if [ "$DRY_RUN" = true ]; then
     info "Would verify that both files contain version = \"$VERSION\""
 else
@@ -147,13 +160,13 @@ else
     success "Version verified in both files: $VERSION"
 fi
 
-# Step 4: Commit changes
-info "\n[4/6] Committing changes..."
+# Step 5: Commit changes
+info "\n[5/7] Committing changes..."
 if [ "$DRY_RUN" = true ]; then
-    info "Would run: git add pyproject.toml Cargo.toml"
-    info "Would run: git commit -m 'Bump version to $VERSION'"
+    info "Would run: git add pyproject.toml Cargo.toml uv.lock Cargo.lock"
+    info "Would commit: 'Bump version to $VERSION'"
 else
-    git add pyproject.toml Cargo.toml
+    git add pyproject.toml Cargo.toml uv.lock Cargo.lock
     # Check if there are any changes staged
     if git diff --cached --quiet; then
         warning "No changes to commit (version already at $VERSION)"
@@ -163,8 +176,8 @@ else
     fi
 fi
 
-# Step 5: Create and push tag
-info "\n[5/6] Creating and pushing tag v$VERSION..."
+# Step 6: Create and push tag
+info "\n[6/7] Creating and pushing tag v$VERSION..."
 if [ "$DRY_RUN" = true ]; then
     info "Would run: git tag v$VERSION"
     info "Would run: git push origin $CURRENT_BRANCH"
@@ -176,8 +189,8 @@ else
     success "Tag v$VERSION created and pushed"
 fi
 
-# Step 6: Summary and next steps
-info "\n[6/6] Release initiated!"
+# Step 7: Summary and next steps
+info "\n[7/7] Release initiated!"
 success "\n✓ Version bumped: $CURRENT_VERSION → $VERSION"
 success "✓ Changes committed and pushed"
 success "✓ Tag v$VERSION created and pushed"
