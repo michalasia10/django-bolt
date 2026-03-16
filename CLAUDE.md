@@ -607,12 +607,42 @@ When adding new common response types, add both a Python integer constant and a 
 
 ## Testing Principles
 
-### Tests Must Fail Without the Fix
+### Red-Green TDD
 
-When adding tests for bug fixes, the test MUST fail when the fix is reverted. This ensures:
+All tests must follow the Red-Green pattern:
 
-1. The test actually validates the fix, not some unrelated behavior
-2. The test would have caught the bug if it existed before
-3. We're not testing bogus claims that pass regardless of the fix
+1. **RED**: Write the test first. It must FAIL without the implementation. This proves the test actually validates the behavior, not something unrelated.
+2. **GREEN**: Write the minimal implementation to make the test pass.
+3. **Verify**: Revert the implementation and confirm the test fails again. Only then finalize.
 
-**How to verify**: Before finalizing a bug fix test, revert the fix and confirm the test fails. Only then apply the fix and confirm the test passes.
+This applies to both new features and bug fixes. A test that passes without the corresponding code change is worthless.
+
+### Use TestClient for Integration Tests
+
+Use `TestClient` (not subprocess servers) for integration tests. It runs requests through the full Rust/Actix pipeline in-process — fast, deterministic, no port conflicts:
+
+```python
+from django_bolt import BoltAPI
+from django_bolt.testing import TestClient
+
+api = BoltAPI(...)
+
+@api.get("/hello")
+async def hello():
+    return {"message": "world"}
+
+with TestClient(api) as client:
+    response = client.get("/hello")
+    assert response.status_code == 200
+```
+
+`TestClient` is lifespan-aware — it enters the lifespan context on `__enter__` and exits on `__exit__`, so lifecycle hooks are exercised automatically.
+
+Only use subprocess-based tests (`subprocess.Popen` + `runbolt`) when testing behavior that `TestClient` cannot exercise (e.g., multi-process, signal handling, actual TCP).
+
+### What Makes a Good Test
+
+- **Tests must fail without the fix** — if reverting the code change doesn't break the test, the test is bogus
+- **Test behavior, not implementation** — assert on HTTP responses and observable side effects, not internal state
+- **One assertion per concern** — each test should verify one thing clearly
+- **No mocks for things you own** — use `TestClient` to test through the real stack, not mocks of internal functions

@@ -4,7 +4,7 @@ icon: lucide/file-image
 
 # Static Files
 
-Django-Bolt serves static files directly from Rust using Actix-files, providing high-performance static file delivery without Python overhead.
+For production deployments, we recommend letting **Nginx** handle static files at the reverse proxy layer — this offloads static traffic entirely so Django-Bolt focuses on API requests. That said, Django-Bolt also serves static files directly from Rust using Actix-files, delivering high-performance static file serving without Python overhead — a solid option when you want a simpler setup without configuring static file handling in your reverse proxy.
 
 ## Overview
 
@@ -42,16 +42,25 @@ When a static file is requested, Django-Bolt searches in this order:
 
 1. **STATIC_ROOT** - Collected static files (fastest)
 2. **STATICFILES_DIRS** - Additional configured directories
-3. **Django staticfiles finders** - App-level static files (e.g., admin)
+3. **Django staticfiles finders** (debug mode only) - App-level static files (e.g., admin)
 
 The first match is returned. Files in `STATIC_ROOT` take priority.
 
+!!! note "Finders disabled in production"
+    For security, Django's staticfiles finders fallback is only enabled when `DEBUG=True`. In production, only files in `STATIC_ROOT` and `STATICFILES_DIRS` are served. Run `collectstatic` to copy app-level static files (like admin assets) into `STATIC_ROOT`.
+
 ## Django admin integration
 
-Django admin static files are automatically served. No additional configuration is needed - Django-Bolt uses Django's staticfiles finders as a fallback to locate admin CSS, JavaScript, and images.
+In development (`DEBUG=True`), Django admin static files are automatically served via Django's staticfiles finders — no extra configuration needed.
+
+In production (`DEBUG=False`), you must run `collectstatic` so admin assets are copied into `STATIC_ROOT`:
+
+```bash
+python manage.py collectstatic
+```
 
 ```python
-# Admin works out of the box
+# Admin works out of the box in development
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.staticfiles",
@@ -156,25 +165,15 @@ The Django `{% static %}` template tag works as expected:
 Static file serving runs primarily in Rust:
 
 - **No Python GIL for configured directories** - Files in `STATIC_ROOT` and `STATICFILES_DIRS` are served without touching Python
-- **Django finders fallback** - Only app-level static files (like admin) require a Python call
+- **Django finders fallback** (debug mode only) - App-level static files (like admin) require a Python call; disabled in production for security
 - **Async I/O** - Non-blocking file reads via Actix
 - **Smart read modes** - Sync reads for small files (<256KB), async for large files
 - **Efficient caching** - Proper HTTP caching headers reduce server load
 
-### Comparison with alternatives
-
-| Method | RPS (approx) | Notes |
-|--------|--------------|-------|
-| Django-Bolt (Rust) | 50,000+ | Direct Actix serving |
-| WhiteNoise | 10,000 | Python middleware |
-| Django dev server | 500 | Not for production |
-| Nginx (separate) | 100,000+ | Additional infrastructure |
-
-Django-Bolt provides near-Nginx performance without requiring a separate web server.
 
 ## Production deployment
 
-For production, collect static files as usual:
+For production, collect static files (including admin assets) into `STATIC_ROOT`:
 
 ```bash
 python manage.py collectstatic
@@ -186,7 +185,7 @@ Then run Django-Bolt:
 python manage.py runbolt --host 0.0.0.0 --port 8000 --processes 4
 ```
 
-Static files are served from `STATIC_ROOT` at high performance. No additional web server (Nginx, Apache) is required for static files.
+Static files are served from `STATIC_ROOT` with async I/O, ETag caching, and range request support.
 
 ## Troubleshooting
 
